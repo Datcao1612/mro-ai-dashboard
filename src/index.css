@@ -1,0 +1,41 @@
+@import "tailwindcss";
+
+@theme {
+  --color-primary-light: #f4f4f5;
+  --color-primary-dark: #18181b;
+  --color-accent-green: #10b981;
+  --color-accent-orange: #f97316;
+  --color-accent-red: #ef4444;
+}
+
+body {
+  @apply bg-zinc-50 text-zinc-900 antialiased font-sans;
+}
+
+.dropzone-container {
+  @apply w-full h-[300px] rounded-sm border-[1px] border-zinc-300 border-dashed bg-white 
+         flex flex-col items-center justify-center cursor-pointer transition-all duration-300 ease-out;
+}
+.dropzone-container:hover {
+  @apply border-zinc-600 shadow-[4px_4px_0px_#18181b] -translate-y-1 -translate-x-1;
+}
+
+.card-minimal {
+  @apply bg-white border border-zinc-200 shadow-sm p-6 overflow-hidden;
+}
+
+/* Scrollbar tweaks for standard tables */
+::-webkit-scrollbar {
+  height: 6px;
+  width: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent; 
+}
+::-webkit-scrollbar-thumb {
+  background: #d4d4d8; 
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #a1a1aa; 
+}
