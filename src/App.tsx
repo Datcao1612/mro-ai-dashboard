@@ -1,14 +1,67 @@
 import { useState } from 'react';
 import { extractTextFromFile } from './utils/fileParser';
 import { analyzeMROData } from './utils/aiClient';
-import type { MROAnalysisResult } from './utils/aiClient';
-import { UploadCloud, CheckCircle2, Clock, AlertTriangle, FileText, Loader2, Download } from 'lucide-react';
+import type { MROAnalysisResult, MROItem } from './utils/aiClient';
+import { UploadCloud, CheckCircle2, Clock, AlertTriangle, FileText, Loader2, Download, Sparkles } from 'lucide-react';
 import * as XLSX from 'xlsx';
 function App() {
   const [file, setFile] = useState<File | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [results, setResults] = useState<MROAnalysisResult | null>(null);
+  const [isReevaluating, setIsReevaluating] = useState(false);
+
+  const handleCellChange = (index: number, field: keyof MROItem, value: string) => {
+    if (!results) return;
+    const newTable = [...results.table];
+    newTable[index] = { ...newTable[index], [field]: value };
+    
+    if (field === 'quantity' || field === 'unitPrice') {
+       const qtyStr = String(newTable[index].quantity || '');
+       const costStr = String(newTable[index].unitPrice || '');
+       const qty = parseFloat(qtyStr.replace(/,/g, '')) || 0;
+       const cost = parseFloat(costStr.replace(/,/g, '')) || 0;
+       if (qty > 0 && cost > 0) {
+           newTable[index].totalAmount = String(qty * cost);
+       }
+    }
+    
+    setResults({ ...results, table: newTable });
+  };
+
+  const handleReevaluate = async () => {
+    if (!results) return;
+    setIsReevaluating(true);
+    setError(null);
+    try {
+      const headers = ['STT', 'Mã PR', 'Mô Tả Vật Tư', 'ĐVT', 'Số Lượng', 'Đơn Giá', 'Thành Tiền', 'Ngày Đề Xuất', 'Ngày Dự Kiến', 'Ngày Thực Tế', 'Trạng Thái'];
+      const csvRows = results.table.map(row => 
+         [
+            row.stt, 
+            `"${(String(row.prNo || '')).replace(/"/g, '""')}"`,
+            `"${(String(row.description || '')).replace(/"/g, '""')}"`,
+            `"${(String(row.unit || '')).replace(/"/g, '""')}"`,
+            `"${(String(row.quantity || '')).replace(/"/g, '""')}"`,
+            `"${(String(row.unitPrice || '')).replace(/"/g, '""')}"`,
+            `"${(String(row.totalAmount || '')).replace(/"/g, '""')}"`,
+            `"${(String(row.proposalDate || '')).replace(/"/g, '""')}"`,
+            `"${(String(row.expectedDate || '')).replace(/"/g, '""')}"`,
+            `"${(String(row.actualDate || '')).replace(/"/g, '""')}"`,
+            `"${(String(row.status || '')).replace(/"/g, '""')}"`
+         ].join(',')
+      );
+      const csvString = [headers.join(','), ...csvRows].join('\n');
+      const payload = `--- BÁO CÁO MRO DÙNG ĐỂ ĐÁNH GIÁ LẠI ---\n\n` + csvString;
+      
+      const analysis = await analyzeMROData(payload);
+      setResults(analysis);
+    } catch (err) {
+      console.error(err);
+      setError(err instanceof Error ? err.message : 'Có lỗi trong quá trình Đánh giá lại dữ liệu.');
+    } finally {
+      setIsReevaluating(false);
+    }
+  };
 
   const handleDrop = async (e: React.DragEvent) => {
     e.preventDefault();
@@ -224,7 +277,15 @@ function App() {
                   )}
                 </ul>
               </div>
-              <div className="shrink-0 md:pt-1">
+              <div className="shrink-0 md:pt-1 flex flex-col md:flex-row items-center gap-3">
+                <button 
+                  onClick={handleReevaluate}
+                  disabled={isReevaluating}
+                  className="flex items-center gap-2 px-6 py-2.5 bg-blue-50 text-blue-700 rounded-[2px] transition-all hover:bg-blue-100 shadow-sm text-sm font-semibold whitespace-nowrap border border-blue-200 disabled:opacity-50"
+                >
+                  {isReevaluating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
+                  Đánh Giá Lại Gần Nhất
+                </button>
                 <button 
                   onClick={exportToExcel}
                   className="flex items-center gap-2 px-6 py-2.5 bg-zinc-900 rounded-[2px] transition-all hover:bg-zinc-700 shadow-sm text-sm font-semibold whitespace-nowrap border-none"
@@ -270,16 +331,36 @@ function App() {
                       const isComplete = row.status === 'ĐÃ VỀ';
                       return (
                         <tr key={idx} className={`transition-colors ${row.isDelayed ? 'bg-red-50/60 hover:bg-red-100/60' : 'hover:bg-zinc-50'}`}>
-                          <td className="px-5 py-4 text-center text-zinc-400">{row.stt}</td>
-                          <td className="px-5 py-4 font-mono text-zinc-900">{row.prNo || '-'}</td>
-                          <td className="px-5 py-4 truncate max-w-[300px]" title={row.description}>{row.description || '-'}</td>
-                          <td className="px-5 py-4">{row.unit || '-'}</td>
-                          <td className="px-5 py-4 text-right font-mono text-zinc-700 font-medium">{row.quantity || '-'}</td>
-                          <td className="px-5 py-4 text-right font-mono text-zinc-500">{formatCurrency(row.unitPrice)}</td>
-                          <td className="px-5 py-4 text-right font-mono text-zinc-900 font-medium">{formatCurrency(row.totalAmount)}</td>
-                          <td className="px-5 py-4 text-center font-mono text-zinc-500">{row.proposalDate || '-'}</td>
-                          <td className={`px-5 py-4 text-center font-mono ${row.isDelayed && !isComplete ? 'text-red-600 font-semibold' : 'text-zinc-500'}`}>{row.expectedDate || '-'}</td>
-                          <td className={`px-5 py-4 text-center font-mono ${isComplete ? (row.isDelayed ? 'text-red-600 font-semibold' : 'text-emerald-600 font-medium') : 'text-zinc-500'}`}>{row.actualDate || '-'}</td>
+                          <td className="p-0 border-b border-zinc-100 align-middle">
+                            <div className="px-5 py-4 text-center text-zinc-400">{row.stt}</div>
+                          </td>
+                          <td className="p-0 border-b border-zinc-100 align-middle relative group focus-within:z-10">
+                            <input value={row.prNo || ''} onChange={(e) => handleCellChange(idx, 'prNo', e.target.value)} className="w-full bg-transparent px-5 py-4 font-mono text-zinc-900 border-none outline-none focus:bg-white focus:ring-1 focus:ring-blue-500 hover:bg-zinc-100/50 transition-colors" />
+                          </td>
+                          <td className="p-0 border-b border-zinc-100 align-middle relative group focus-within:z-10">
+                            <input value={row.description || ''} onChange={(e) => handleCellChange(idx, 'description', e.target.value)} className="w-full min-w-[200px] bg-transparent px-5 py-4 truncate border-none outline-none focus:bg-white focus:ring-1 focus:ring-blue-500 hover:bg-zinc-100/50 transition-colors" title={row.description} />
+                          </td>
+                          <td className="p-0 border-b border-zinc-100 align-middle relative group focus-within:z-10">
+                            <input value={row.unit || ''} onChange={(e) => handleCellChange(idx, 'unit', e.target.value)} className="w-full bg-transparent px-5 py-4 border-none outline-none focus:bg-white focus:ring-1 focus:ring-blue-500 hover:bg-zinc-100/50 transition-colors" />
+                          </td>
+                          <td className="p-0 border-b border-zinc-100 align-middle relative group focus-within:z-10">
+                            <input value={row.quantity || ''} onChange={(e) => handleCellChange(idx, 'quantity', e.target.value)} className="w-full text-right bg-transparent px-5 py-4 font-mono text-zinc-700 font-medium border-none outline-none focus:bg-white focus:ring-1 focus:ring-blue-500 hover:bg-zinc-100/50 transition-colors" />
+                          </td>
+                          <td className="p-0 border-b border-zinc-100 align-middle relative group focus-within:z-10">
+                            <input value={row.unitPrice || ''} onChange={(e) => handleCellChange(idx, 'unitPrice', e.target.value)} className="w-full text-right bg-transparent px-5 py-4 font-mono text-zinc-500 border-none outline-none focus:bg-white focus:ring-1 focus:ring-blue-500 hover:bg-zinc-100/50 transition-colors" />
+                          </td>
+                          <td className="p-0 border-b border-zinc-100 align-middle">
+                            <div className="w-full text-right bg-transparent px-5 py-4 font-mono text-zinc-900 font-medium">{formatCurrency(row.totalAmount)}</div>
+                          </td>
+                          <td className="p-0 border-b border-zinc-100 align-middle relative group focus-within:z-10">
+                            <input value={row.proposalDate || ''} onChange={(e) => handleCellChange(idx, 'proposalDate', e.target.value)} className="w-full text-center bg-transparent px-5 py-4 font-mono text-zinc-500 border-none outline-none focus:bg-white focus:ring-1 focus:ring-blue-500 hover:bg-zinc-100/50 transition-colors" />
+                          </td>
+                          <td className="p-0 border-b border-zinc-100 align-middle relative group focus-within:z-10">
+                            <input value={row.expectedDate || ''} onChange={(e) => handleCellChange(idx, 'expectedDate', e.target.value)} className={`w-full text-center bg-transparent px-5 py-4 font-mono border-none outline-none focus:bg-white focus:ring-1 focus:ring-blue-500 hover:bg-zinc-100/50 transition-colors ${row.isDelayed && !isComplete ? 'text-red-600 font-semibold' : 'text-zinc-500'}`} />
+                          </td>
+                          <td className="p-0 border-b border-zinc-100 align-middle relative group focus-within:z-10">
+                            <input value={row.actualDate || ''} onChange={(e) => handleCellChange(idx, 'actualDate', e.target.value)} className={`w-full text-center bg-transparent px-5 py-4 font-mono border-none outline-none focus:bg-white focus:ring-1 focus:ring-blue-500 hover:bg-zinc-100/50 transition-colors ${isComplete ? (row.isDelayed ? 'text-red-600 font-semibold' : 'text-emerald-600 font-medium') : 'text-zinc-500'}`} />
+                          </td>
                           <td className="px-5 py-4">
                             <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-[2px] text-xs font-semibold ${isComplete ? 'bg-emerald-100 text-emerald-800' : 'bg-orange-100 text-orange-800'}`}>
                               {isComplete ? <CheckCircle2 className="w-3 h-3" /> : <Clock className="w-3 h-3" />}
