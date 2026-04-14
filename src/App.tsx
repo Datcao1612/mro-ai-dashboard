@@ -236,63 +236,109 @@ function App() {
       {/* Report Section (Right) */}
       <div className="flex-1 w-full min-w-0">
         {!results && !loading && (
-          <div className="h-full min-h-[300px] xl:min-h-[460px] border border-zinc-200 bg-white flex items-center justify-center text-zinc-400">
+          <div className="h-full min-h-[300px] xl:min-h-[460px] border border-dashed border-indigo-200 bg-gradient-to-br from-sky-50 to-indigo-50 rounded-sm flex items-center justify-center text-indigo-300 text-sm tracking-widest uppercase">
             [ Đang chờ dữ liệu đầu vào ]
           </div>
         )}
 
         {loading && !results && (
-          <div className="h-full min-h-[300px] xl:min-h-[460px] border border-zinc-200 bg-zinc-50 flex items-center justify-center">
+          <div className="h-full min-h-[300px] xl:min-h-[460px] border border-indigo-100 bg-gradient-to-br from-sky-50 via-indigo-50 to-violet-50 rounded-sm flex items-center justify-center">
             <div className="flex flex-col items-center gap-3">
-              <Loader2 className="w-8 h-8 animate-spin text-zinc-400" />
-              <p className="text-sm font-medium text-zinc-500 tracking-widest uppercase">Analyzing Data Mật...</p>
+              <Loader2 className="w-8 h-8 animate-spin text-indigo-400" />
+              <p className="text-sm font-medium text-indigo-400 tracking-widest uppercase">Analyzing Data...</p>
             </div>
           </div>
         )}
 
         {results && (
           <div className="animate-in fade-in slide-in-from-bottom-4 duration-500 h-full">
-            {/* Textual Report & Action */}
-            <div className="bg-zinc-50 border border-zinc-200 p-6 flex flex-col md:flex-row gap-6 justify-between items-start h-full">
-              <div className="text-sm text-zinc-700 leading-relaxed flex-1 w-full">
-                <p className="font-semibold text-zinc-900 mb-3 text-base uppercase tracking-wide border-b border-zinc-200 pb-2">Báo Cáo Nhanh & Đánh Giá Tiến Độ</p>
-                <ul className="list-disc pl-5 space-y-2">
-                  <li><strong>Tình hình chung:</strong> Hệ thống ghi nhận tổng cộng <strong>{results.summary.total}</strong> đơn hàng. Trong đó có <strong>{results.summary.completed}</strong> đơn đã về (chiếm {results.summary.completedPercentage}) và <strong>{results.summary.pending}</strong> đơn chưa về (chiếm {results.summary.pendingPercentage}).</li>
-                  {results.summary.totalValue && (
-                     <li><strong>Tổng giá trị:</strong> <span className="text-zinc-900 font-medium">{formatCurrency(results.summary.totalValue)}</span></li>
-                  )}
-                  {parsedDeliveryReport.map((report, idx) => (
-                    <li key={idx}>{report}</li>
-                  ))}
-                  {parsedDelayedItems.length > 0 && (
-                    <li className="text-red-700 pt-2 border-t border-red-100">
-                      <strong className="block mb-2">Cảnh báo chậm trễ ({parsedDelayedItems.length} vật tư):</strong>
-                      <ul className="list-disc pl-5 space-y-1.5 text-red-600">
-                        {parsedDelayedItems.map((item, idx) => (
-                          <li key={idx} className="font-medium text-red-700"><span className="text-zinc-800">{item}</span></li>
-                        ))}
-                      </ul>
-                    </li>
-                  )}
-                </ul>
+            {/* Report container with gradient background */}
+            <div className="h-full bg-gradient-to-br from-sky-50 via-indigo-50 to-violet-50 border border-indigo-100 rounded-sm overflow-hidden flex flex-col">
+
+              {/* Title bar */}
+              <div className="px-6 py-3 bg-gradient-to-r from-indigo-600 to-violet-600 flex items-center justify-between">
+                <p className="font-bold text-white text-sm uppercase tracking-widest">Báo Cáo Nhanh & Đánh Giá Tiến Độ</p>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={handleReevaluate}
+                    disabled={isReevaluating}
+                    className="flex items-center gap-1.5 px-4 py-1.5 bg-white/15 hover:bg-white/25 text-white border border-white/30 rounded-[2px] text-xs font-semibold whitespace-nowrap transition-all disabled:opacity-50"
+                  >
+                    {isReevaluating ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
+                    Đánh Giá Lại
+                  </button>
+                  <button
+                    onClick={exportToExcel}
+                    className="flex items-center gap-1.5 px-4 py-1.5 bg-emerald-500 hover:bg-emerald-400 text-white rounded-[2px] text-xs font-semibold whitespace-nowrap transition-all"
+                  >
+                    <Download className="w-3.5 h-3.5" />
+                    Xuất Excel
+                  </button>
+                </div>
               </div>
-              <div className="shrink-0 md:pt-1 flex flex-col md:flex-row items-center gap-3">
-                <button 
-                  onClick={handleReevaluate}
-                  disabled={isReevaluating}
-                  className="flex items-center gap-2 px-6 py-2.5 bg-blue-50 text-blue-700 rounded-[2px] transition-all hover:bg-blue-100 shadow-sm text-sm font-semibold whitespace-nowrap border border-blue-200 disabled:opacity-50"
-                >
-                  {isReevaluating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
-                  Đánh Giá Lại Gần Nhất
-                </button>
-                <button 
-                  onClick={exportToExcel}
-                  className="flex items-center gap-2 px-6 py-2.5 bg-zinc-900 rounded-[2px] transition-all hover:bg-zinc-700 shadow-sm text-sm font-semibold whitespace-nowrap border-none"
-                  style={{ color: '#ffffff' }}
-                >
-                  <Download className="w-4 h-4" style={{ color: '#ffffff' }} />
-                  Xuất File Excel
-                </button>
+
+              {/* Stat cards row */}
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3 p-4 border-b border-indigo-100">
+                <div className="bg-white rounded-sm p-3 border border-indigo-100 shadow-sm">
+                  <p className="text-[10px] uppercase tracking-widest text-indigo-400 font-semibold mb-1">Tổng đơn hàng</p>
+                  <p className="text-2xl font-bold text-indigo-700">{results.summary.total}</p>
+                </div>
+                <div className="bg-white rounded-sm p-3 border border-emerald-100 shadow-sm">
+                  <p className="text-[10px] uppercase tracking-widest text-emerald-500 font-semibold mb-1">Đã về</p>
+                  <p className="text-2xl font-bold text-emerald-600">{results.summary.completed}</p>
+                  <p className="text-[11px] text-emerald-400 font-medium">{results.summary.completedPercentage}</p>
+                </div>
+                <div className="bg-white rounded-sm p-3 border border-amber-100 shadow-sm">
+                  <p className="text-[10px] uppercase tracking-widest text-amber-500 font-semibold mb-1">Chưa về</p>
+                  <p className="text-2xl font-bold text-amber-600">{results.summary.pending}</p>
+                  <p className="text-[11px] text-amber-400 font-medium">{results.summary.pendingPercentage}</p>
+                </div>
+                <div className="bg-white rounded-sm p-3 border border-rose-100 shadow-sm">
+                  <p className="text-[10px] uppercase tracking-widest text-rose-400 font-semibold mb-1">Chậm trễ</p>
+                  <p className="text-2xl font-bold text-rose-600">{parsedDelayedItems.length}</p>
+                  <p className="text-[11px] text-rose-300 font-medium">vật tư</p>
+                </div>
+              </div>
+
+              {/* Report body */}
+              <div className="flex flex-col md:flex-row gap-4 p-4 flex-1">
+                {/* Delivery report */}
+                <div className="flex-1 min-w-0">
+                  {results.summary.totalValue && (
+                    <div className="mb-3 px-3 py-2 bg-indigo-100 border border-indigo-200 rounded-sm flex items-center gap-2">
+                      <span className="text-[11px] uppercase tracking-widest text-indigo-500 font-semibold">Tổng giá trị:</span>
+                      <span className="text-sm font-bold text-indigo-800">{formatCurrency(results.summary.totalValue)}</span>
+                    </div>
+                  )}
+                  {parsedDeliveryReport.length > 0 && (
+                    <ul className="space-y-1.5">
+                      {parsedDeliveryReport.map((report, idx) => (
+                        <li key={idx} className="flex items-start gap-2 text-sm text-indigo-900">
+                          <span className="mt-1.5 shrink-0 w-1.5 h-1.5 rounded-full bg-indigo-400 inline-block" />
+                          {report}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+
+                {/* Delayed warning */}
+                {parsedDelayedItems.length > 0 && (
+                  <div className="md:w-72 shrink-0 bg-rose-50 border border-rose-200 rounded-sm p-3">
+                    <p className="flex items-center gap-1.5 text-[11px] uppercase tracking-widest font-bold text-rose-600 mb-2">
+                      <AlertTriangle className="w-3.5 h-3.5" />
+                      Cảnh báo chậm trễ
+                    </p>
+                    <ul className="space-y-1">
+                      {parsedDelayedItems.map((item, idx) => (
+                        <li key={idx} className="text-xs text-rose-800 font-medium flex items-start gap-1.5">
+                          <span className="mt-1 shrink-0 w-1.5 h-1.5 rounded-full bg-rose-400 inline-block" />
+                          {item}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
               </div>
             </div>
           </div>
