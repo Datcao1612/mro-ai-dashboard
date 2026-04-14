@@ -63,7 +63,7 @@ function App() {
     }
   };
 
-  const handleDrop = async (e: React.DragEvent) => {
+  const handleDrop = (e: React.DragEvent) => {
     e.preventDefault();
     if (e.dataTransfer.files && e.dataTransfer.files[0]) {
       handleFile(e.dataTransfer.files[0]);
@@ -97,9 +97,8 @@ function App() {
   };
 
   const formatCurrency = (val: string | undefined | number) => {
-    if (!val || val === '-') return '-';
-    let str = String(val).trim();
-    // Chèn dấu phẩy vào các chuỗi số nguyên dài hơn 3 ký tự
+    if (!val || val === '-' || val === 0) return '-';
+    const str = String(val).trim();
     return str.replace(/\d{4,}/g, (match) => {
       return match.replace(/\B(?=(\d{3})+(?!\d))/g, ",");
     });

@@ -30,9 +30,8 @@ async function parsePDF(file: File): Promise<string> {
   for (let i = 1; i <= maxPages; i++) {
     const page = await pdfFile.getPage(i);
     const textContent = await page.getTextContent();
-    const pageText = textContent.items
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      .map((item: any) => item.str || '')
+    const pageText = (textContent.items as Array<{ str?: string }>)
+      .map((item) => item.str || '')
       .join(' ');
     fullText += `--- Page ${i} ---\n${pageText}\n\n`;
   }

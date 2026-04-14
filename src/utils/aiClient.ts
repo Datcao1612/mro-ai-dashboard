@@ -104,9 +104,9 @@ export async function analyzeMROData(rawText: string): Promise<MROAnalysisResult
   if (!apiKey) {
     throw new Error("Missing VITE_GEMINI_API_KEY environment variable. Vui lòng thiết lập API key.");
   }
-  const ai = new GoogleGenAI({ apiKey });  // Model Gemini 2.5 Flash is recommended for fast unstructured data processing with high context chunks
+  const ai = new GoogleGenAI({ apiKey });
   const response = await ai.models.generateContent({
-    model: 'gemini-2.5-flash',
+    model: 'gemini-2.5-flash-preview-04-17',
     contents: rawText,
     config: {
       systemInstruction: SYSTEM_PROMPT,
