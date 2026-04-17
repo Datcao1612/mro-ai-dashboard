@@ -2,30 +2,54 @@ import { useState } from 'react';
 import { extractTextFromFile } from './utils/fileParser';
 import { analyzeMROData } from './utils/aiClient';
 import type { MROAnalysisResult, MROItem } from './utils/aiClient';
-import { UploadCloud, CheckCircle2, Clock, AlertTriangle, FileText, Loader2, Download, Sparkles } from 'lucide-react';
-import * as XLSX from 'xlsx';
+import {
+  UploadCloud, CheckCircle2, Clock, AlertTriangle,
+  FileText, Loader2, Download, Sparkles,
+  ShieldCheck, Zap, ScanText, Package,
+} from 'lucide-react';
+// xlsx is dynamically imported inside exportToExcel() — not bundled at startup
+
+// ─── StatCard helper ────────────────────────────────────────────────────────
+
+type CardColor = 'indigo' | 'emerald' | 'amber' | 'rose';
+const CARD_COLORS: Record<CardColor, { label: string; value: string; sub: string; border: string }> = {
+  indigo:  { label: 'text-indigo-500',  value: 'text-indigo-700',  sub: 'text-indigo-400',  border: 'border-indigo-100' },
+  emerald: { label: 'text-emerald-500', value: 'text-emerald-600', sub: 'text-emerald-400', border: 'border-emerald-100' },
+  amber:   { label: 'text-amber-500',   value: 'text-amber-600',   sub: 'text-amber-400',   border: 'border-amber-100' },
+  rose:    { label: 'text-rose-400',    value: 'text-rose-600',    sub: 'text-rose-300',    border: 'border-rose-100' },
+};
+
+function StatCard({ label, value, sub, color }: { label: string; value: number; sub?: string; color: CardColor }) {
+  const c = CARD_COLORS[color];
+  return (
+    <div className={`bg-white p-3 border ${c.border} shadow-sm`}>
+      <p className={`text-[10px] uppercase tracking-widest font-semibold mb-1 ${c.label}`}>{label}</p>
+      <p className={`text-2xl font-bold leading-none ${c.value}`}>{value}</p>
+      {sub && <p className={`text-[11px] font-medium mt-0.5 ${c.sub}`}>{sub}</p>}
+    </div>
+  );
+}
+
+// ─── Main App ───────────────────────────────────────────────────────────────
+
 function App() {
-  const [file, setFile] = useState<File | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [results, setResults] = useState<MROAnalysisResult | null>(null);
+  const [file, setFile]                     = useState<File | null>(null);
+  const [loading, setLoading]               = useState(false);
+  const [error, setError]                   = useState<string | null>(null);
+  const [results, setResults]               = useState<MROAnalysisResult | null>(null);
   const [isReevaluating, setIsReevaluating] = useState(false);
+
+  // ── Handlers ──────────────────────────────────────────────────────────────
 
   const handleCellChange = (index: number, field: keyof MROItem, value: string) => {
     if (!results) return;
     const newTable = [...results.table];
     newTable[index] = { ...newTable[index], [field]: value };
-    
     if (field === 'quantity' || field === 'unitPrice') {
-       const qtyStr = String(newTable[index].quantity || '');
-       const costStr = String(newTable[index].unitPrice || '');
-       const qty = parseFloat(qtyStr.replace(/,/g, '')) || 0;
-       const cost = parseFloat(costStr.replace(/,/g, '')) || 0;
-       if (qty > 0 && cost > 0) {
-           newTable[index].totalAmount = String(qty * cost);
-       }
+      const qty  = parseFloat(String(newTable[index].quantity  || '').replace(/,/g, '')) || 0;
+      const cost = parseFloat(String(newTable[index].unitPrice || '').replace(/,/g, '')) || 0;
+      if (qty > 0 && cost > 0) newTable[index].totalAmount = String(qty * cost);
     }
-    
     setResults({ ...results, table: newTable });
   };
 
@@ -34,30 +58,26 @@ function App() {
     setIsReevaluating(true);
     setError(null);
     try {
-      const headers = ['STT', 'Mã PR', 'Mô Tả Vật Tư', 'ĐVT', 'Số Lượng', 'Đơn Giá', 'Thành Tiền', 'Ngày Đề Xuất', 'Ngày Dự Kiến', 'Ngày Thực Tế', 'Trạng Thái'];
-      const csvRows = results.table.map(row => 
-         [
-            row.stt, 
-            `"${(String(row.prNo || '')).replace(/"/g, '""')}"`,
-            `"${(String(row.description || '')).replace(/"/g, '""')}"`,
-            `"${(String(row.unit || '')).replace(/"/g, '""')}"`,
-            `"${(String(row.quantity || '')).replace(/"/g, '""')}"`,
-            `"${(String(row.unitPrice || '')).replace(/"/g, '""')}"`,
-            `"${(String(row.totalAmount || '')).replace(/"/g, '""')}"`,
-            `"${(String(row.proposalDate || '')).replace(/"/g, '""')}"`,
-            `"${(String(row.expectedDate || '')).replace(/"/g, '""')}"`,
-            `"${(String(row.actualDate || '')).replace(/"/g, '""')}"`,
-            `"${(String(row.status || '')).replace(/"/g, '""')}"`
-         ].join(',')
+      const headers = ['STT','Mã PR','Mô Tả Vật Tư','ĐVT','Số Lượng','Đơn Giá','Thành Tiền','Ngày Đề Xuất','Ngày Dự Kiến','Ngày Thực Tế','Trạng Thái'];
+      const csvRows = results.table.map(row =>
+        [row.stt,
+          `"${String(row.prNo        || '').replace(/"/g,'""')}"`,
+          `"${String(row.description || '').replace(/"/g,'""')}"`,
+          `"${String(row.unit        || '').replace(/"/g,'""')}"`,
+          `"${String(row.quantity    || '').replace(/"/g,'""')}"`,
+          `"${String(row.unitPrice   || '').replace(/"/g,'""')}"`,
+          `"${String(row.totalAmount || '').replace(/"/g,'""')}"`,
+          `"${String(row.proposalDate|| '').replace(/"/g,'""')}"`,
+          `"${String(row.expectedDate|| '').replace(/"/g,'""')}"`,
+          `"${String(row.actualDate  || '').replace(/"/g,'""')}"`,
+          `"${String(row.status      || '').replace(/"/g,'""')}"`,
+        ].join(',')
       );
-      const csvString = [headers.join(','), ...csvRows].join('\n');
-      const payload = `--- BÁO CÁO MRO DÙNG ĐỂ ĐÁNH GIÁ LẠI ---\n\n` + csvString;
-      
-      const analysis = await analyzeMROData(payload);
-      setResults(analysis);
+      const payload = `--- BÁO CÁO MRO DÙNG ĐỂ ĐÁNH GIÁ LẠI ---\n\n` +
+        [headers.join(','), ...csvRows].join('\n');
+      setResults(await analyzeMROData(payload));
     } catch (err) {
-      console.error(err);
-      setError(err instanceof Error ? err.message : 'Có lỗi trong quá trình Đánh giá lại dữ liệu.');
+      setError(err instanceof Error ? err.message : 'Có lỗi trong quá trình Đánh giá lại.');
     } finally {
       setIsReevaluating(false);
     }
@@ -65,15 +85,11 @@ function App() {
 
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault();
-    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
-      handleFile(e.dataTransfer.files[0]);
-    }
+    if (e.dataTransfer.files?.[0]) handleFile(e.dataTransfer.files[0]);
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      handleFile(e.target.files[0]);
-    }
+    if (e.target.files?.[0]) handleFile(e.target.files[0]);
   };
 
   const handleFile = async (selectedFile: File) => {
@@ -81,334 +97,383 @@ function App() {
     setLoading(true);
     setError(null);
     setResults(null);
-
     try {
-      // 1. Parse File
       const rawText = await extractTextFromFile(selectedFile);
-      // 2. Call AI
-      const analysis = await analyzeMROData(rawText);
-      setResults(analysis);
+      setResults(await analyzeMROData(rawText));
     } catch (err) {
-      console.error(err);
       setError(err instanceof Error ? err.message : 'Có lỗi xảy ra trong quá trình trích xuất.');
     } finally {
       setLoading(false);
     }
   };
 
-  const formatCurrency = (val: string | undefined | number) => {
+  // ── Derived data ───────────────────────────────────────────────────────────
+
+  const formatCurrency = (val: string | undefined | number): string => {
     if (!val || val === '-' || val === 0) return '-';
-    const str = String(val).trim();
-    return str.replace(/\d{4,}/g, (match) => {
-      return match.replace(/\B(?=(\d{3})+(?!\d))/g, ",");
-    });
+    const num = parseFloat(String(val).replace(/,/g, '').trim());
+    if (isNaN(num)) return String(val);
+    return new Intl.NumberFormat('en-US').format(num);
   };
 
-  const parsedDeliveryReport = results ? (results.summary.deliveryReport || [])
-    .flatMap(report => report.split('\n'))
-    .map(r => r.replace(/^-\s*/, '').trim())
-    .filter(r => r.length > 0) : [];
+  const parsedDeliveryReport = results
+    ? (results.summary.deliveryReport || [])
+        .flatMap(r => r.split('\n'))
+        .map(r => r.replace(/^-\s*/, '').trim())
+        .filter(r => r.length > 0)
+    : [];
 
-  const parsedDelayedItems = results ? results.table
-    .filter(row => row.isDelayed)
-    .map(row => row.description || "Vật tư không tên")
-    .filter(desc => desc.trim().length > 0) : [];
+  const parsedDelayedItems = results
+    ? results.table
+        .filter(row => row.isDelayed)
+        .map(row => row.description || 'Vật tư không tên')
+        .filter(d => d.trim().length > 0)
+    : [];
 
-  const exportToExcel = () => {
+  // ── Export ─────────────────────────────────────────────────────────────────
+
+  const exportToExcel = async () => {
     if (!results) return;
+    // Dynamic import — xlsx is only fetched when user clicks "Xuất Excel"
+    const XLSX = await import('xlsx');
 
-    // 1. Create Summary Worksheet (Báo Cáo Tổng Quan)
-    const summaryData = [
-      ["BÁO CÁO NHANH & ĐÁNH GIÁ TIẾN ĐỘ"],
-      [""],
-      ["Tình hình chung:", `Hệ thống ghi nhận tổng cộng ${results.summary.total} đơn hàng. Đã về: ${results.summary.completed} (${results.summary.completedPercentage}). Chưa về: ${results.summary.pending} (${results.summary.pendingPercentage}).`],
+    const summaryData: (string | number)[][] = [
+      ['BÁO CÁO NHANH & ĐÁNH GIÁ TIẾN ĐỘ'],
+      [''],
+      ['Tình hình chung:', `Tổng ${results.summary.total} đơn. Đã về: ${results.summary.completed} (${results.summary.completedPercentage}). Chưa về: ${results.summary.pending} (${results.summary.pendingPercentage}).`],
     ];
-
-    if (results.summary.totalValue) {
-      summaryData.push(["Tổng giá trị:", formatCurrency(results.summary.totalValue)]);
-    }
-
-    summaryData.push([""]);
-    summaryData.push(["Nhận xét chi tiết:"]);
-    parsedDeliveryReport.forEach(report => {
-      summaryData.push(["", "-", report]);
-    });
-
+    if (results.summary.totalValue) summaryData.push(['Tổng giá trị:', formatCurrency(results.summary.totalValue)]);
+    summaryData.push([''], ['Nhận xét chi tiết:']);
+    parsedDeliveryReport.forEach(r => summaryData.push(['', '-', r]));
     if (parsedDelayedItems.length > 0) {
-      summaryData.push([""]);
-      summaryData.push(["Cảnh báo chậm trễ:", `Có ${parsedDelayedItems.length} vật tư đang chậm trễ:`]);
-      parsedDelayedItems.forEach(item => {
-        summaryData.push(["", "-", item]);
-      });
+      summaryData.push([''], [`Cảnh báo chậm trễ:`, `${parsedDelayedItems.length} vật tư:`]);
+      parsedDelayedItems.forEach(item => summaryData.push(['', '-', item]));
     }
 
     const wsSummary = XLSX.utils.aoa_to_sheet(summaryData);
     wsSummary['!cols'] = [{ wch: 20 }, { wch: 5 }, { wch: 100 }];
 
-    // 2. Create Details Worksheet (Bảng Dữ Liệu)
-    const worksheet = XLSX.utils.json_to_sheet(results.table.map(row => ({
-      "STT": row.stt,
-      "Mã PR": row.prNo,
-      "Mô Tả Vật Tư": row.description,
-      "ĐVT": row.unit,
-      "Số Lượng": row.quantity,
-      "Đơn Giá": row.unitPrice,
-      "Thành Tiền": row.totalAmount,
-      "Ngày Đề Xuất": row.proposalDate,
-      "Ngày Dự Kiến": row.expectedDate,
-      "Ngày Thực Tế": row.actualDate,
-      "Trạng Thái": row.status
+    const wsData = XLSX.utils.json_to_sheet(results.table.map(row => ({
+      'STT': row.stt, 'Mã PR': row.prNo, 'Mô Tả Vật Tư': row.description,
+      'ĐVT': row.unit, 'Số Lượng': row.quantity, 'Đơn Giá': row.unitPrice,
+      'Thành Tiền': row.totalAmount, 'Ngày Đề Xuất': row.proposalDate,
+      'Ngày Dự Kiến': row.expectedDate, 'Ngày Thực Tế': row.actualDate,
+      'Trạng Thái': row.status,
     })));
 
-    const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, wsSummary, "Bao_Cao_Tong_Quan");
-    XLSX.utils.book_append_sheet(workbook, worksheet, "Bang_Du_Lieu");
-    XLSX.writeFile(workbook, "Bao_Cao_MRO.xlsx");
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, wsSummary, 'Bao_Cao_Tong_Quan');
+    XLSX.utils.book_append_sheet(wb, wsData,    'Bang_Du_Lieu');
+    XLSX.writeFile(wb, 'Bao_Cao_MRO.xlsx');
   };
 
+  // ── Render ─────────────────────────────────────────────────────────────────
+
   return (
-    <div className="min-h-screen p-6 md:p-12 max-w-[1600px] mx-auto flex flex-col gap-8">
-      {/* ⬆️ TOP ROW: Upload & Report */}
-      <div className="flex flex-col xl:flex-row gap-8 items-start w-full">
-        {/* Upload & Settings (Left) */}
-        <div className="w-full xl:w-[450px] shrink-0 space-y-6">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight text-zinc-900 border-l-4 border-zinc-900 pl-4 py-1">
-            MRO Intelligence
-          </h1>
-          <p className="text-sm text-zinc-500 mt-2 uppercase tracking-widest font-semibold">
-            IBS Heavy Industry Data Terminal
-          </p>
+    <div className="min-h-screen bg-zinc-50">
+
+      {/* ── Sticky Header ────────────────────────────────────────────────── */}
+      <header className="sticky top-0 z-20 h-13 bg-white border-b border-zinc-200 flex items-center px-6 gap-4">
+        <div className="w-7 h-7 bg-zinc-900 flex items-center justify-center shrink-0">
+          <Package className="w-3.5 h-3.5 text-white" />
         </div>
+        <span className="font-bold text-zinc-900 tracking-tight text-sm">MRO Intelligence</span>
+        <span className="h-4 w-px bg-zinc-200 hidden sm:block" />
+        <span className="text-xs text-zinc-400 uppercase tracking-widest font-medium hidden sm:block">
+          IBS Heavy Industry
+        </span>
 
-        <label 
-          onDragOver={(e) => e.preventDefault()}
-          onDrop={handleDrop}
-          className="dropzone-container group mt-8 relative block"
-        >
-          <input 
-            type="file" 
-            accept=".pdf, .xlsx, .xls, .csv" 
-            onChange={handleFileChange}
-            className="hidden" 
-          />
-          <div className="flex flex-col items-center gap-4 text-zinc-400 group-hover:text-zinc-700 transition-colors">
-            {loading ? (
-              <Loader2 className="w-10 h-10 animate-spin text-zinc-900" />
-            ) : file ? (
-              <FileText className="w-10 h-10" />
-            ) : (
-              <UploadCloud className="w-10 h-10" />
-            )}
-            <div className="text-center">
-              <p className="font-semibold text-zinc-800">
-                {file ? file.name : 'Upload PDF hoặc XLSX'}
-              </p>
-              <p className="text-xs mt-1">
-                Kéo thả file vào đây hoặc nhấn để chọn
-              </p>
-            </div>
-          </div>
-          {loading && (
-             <div className="absolute inset-x-0 bottom-0 h-1 bg-zinc-200 overflow-hidden">
-               <div className="h-full bg-zinc-900 w-1/3 animate-[slide_1.5s_ease-in-out_infinite]" />
-             </div>
-          )}
-        </label>
-
-        {error && (
-          <div className="p-4 bg-red-50 text-red-700 border border-red-200 text-sm font-medium flex items-start gap-3">
-            <AlertTriangle className="w-5 h-5 shrink-0" />
-            <p>{error}</p>
-          </div>
-        )}
-
-        <div className="text-xs text-zinc-500 bg-zinc-100 p-4 border border-zinc-200 leading-relaxed uppercase tracking-wide">
-          <strong className="block text-zinc-700 mb-2">Rule Enforcements System:</strong>
-          <ul className="list-disc pl-4 space-y-1">
-            <li>Strict Output Mapping (JSON Schema)</li>
-            <li>Anti-Hallucination Guardrails</li>
-            <li>OCR Date Correction Enabled</li>
-          </ul>
+        {/* Right: AI status */}
+        <div className="ml-auto flex items-center gap-2">
+          <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+          <span className="text-xs text-zinc-400 hidden sm:block">Gemini 2.5 Flash Lite</span>
         </div>
-      </div>
+      </header>
 
-      {/* Report Section (Right) */}
-      <div className="flex-1 w-full min-w-0">
-        {!results && !loading && (
-          <div className="h-full min-h-[300px] xl:min-h-[460px] border border-dashed border-indigo-200 bg-gradient-to-br from-sky-50 to-indigo-50 rounded-sm flex items-center justify-center text-indigo-300 text-sm tracking-widest uppercase">
-            [ Đang chờ dữ liệu đầu vào ]
-          </div>
-        )}
+      {/* ── Main Content ─────────────────────────────────────────────────── */}
+      <main className="max-w-[1600px] mx-auto p-6 md:p-8 flex flex-col gap-6">
 
-        {loading && !results && (
-          <div className="h-full min-h-[300px] xl:min-h-[460px] border border-indigo-100 bg-gradient-to-br from-sky-50 via-indigo-50 to-violet-50 rounded-sm flex items-center justify-center">
-            <div className="flex flex-col items-center gap-3">
-              <Loader2 className="w-8 h-8 animate-spin text-indigo-400" />
-              <p className="text-sm font-medium text-indigo-400 tracking-widest uppercase">Analyzing Data...</p>
-            </div>
-          </div>
-        )}
+        {/* TOP ROW: Upload (left) + Report (right) */}
+        <div className="flex flex-col xl:flex-row gap-6 items-start">
 
-        {results && (
-          <div className="animate-in fade-in slide-in-from-bottom-4 duration-500 h-full">
-            {/* Report container with gradient background */}
-            <div className="h-full bg-gradient-to-br from-sky-50 via-indigo-50 to-violet-50 border border-indigo-100 rounded-sm overflow-hidden flex flex-col">
+          {/* ── Left: Upload Panel ────────────────────────────────────────── */}
+          <div className="w-full xl:w-[360px] shrink-0 space-y-4">
 
-              {/* Title bar */}
-              <div className="px-6 py-3 bg-gradient-to-r from-indigo-600 to-violet-600 flex items-center justify-between">
-                <p className="font-bold text-white text-sm uppercase tracking-widest">Báo Cáo Nhanh & Đánh Giá Tiến Độ</p>
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={handleReevaluate}
-                    disabled={isReevaluating}
-                    className="flex items-center gap-1.5 px-4 py-1.5 bg-white/15 hover:bg-white/25 text-white border border-white/30 rounded-[2px] text-xs font-semibold whitespace-nowrap transition-all disabled:opacity-50"
-                  >
-                    {isReevaluating ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
-                    Đánh Giá Lại
-                  </button>
-                  <button
-                    onClick={exportToExcel}
-                    className="flex items-center gap-1.5 px-4 py-1.5 bg-emerald-500 hover:bg-emerald-400 text-white rounded-[2px] text-xs font-semibold whitespace-nowrap transition-all"
-                  >
-                    <Download className="w-3.5 h-3.5" />
-                    Xuất Excel
-                  </button>
+            {/* Dropzone */}
+            <label
+              onDragOver={(e) => e.preventDefault()}
+              onDrop={handleDrop}
+              className="dropzone-container group"
+            >
+              <input
+                type="file"
+                accept=".pdf, .xlsx, .xls, .csv"
+                onChange={handleFileChange}
+                className="hidden"
+              />
+              <div className="flex flex-col items-center gap-3 text-zinc-400 group-hover:text-zinc-700 transition-colors">
+                {loading ? (
+                  <Loader2 className="w-9 h-9 animate-spin text-indigo-500" />
+                ) : file ? (
+                  <FileText className="w-9 h-9 text-indigo-400" />
+                ) : (
+                  <UploadCloud className="w-9 h-9" />
+                )}
+                <div className="text-center">
+                  <p className="font-semibold text-zinc-700 text-sm">
+                    {file ? file.name : 'Upload PDF hoặc XLSX'}
+                  </p>
+                  <p className="text-xs mt-0.5 text-zinc-400">
+                    {loading ? 'Đang phân tích dữ liệu...' : 'Kéo thả hoặc nhấn để chọn'}
+                  </p>
                 </div>
-              </div>
-
-              {/* Stat cards row */}
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-3 p-4 border-b border-indigo-100">
-                <div className="bg-white rounded-sm p-3 border border-indigo-100 shadow-sm">
-                  <p className="text-[10px] uppercase tracking-widest text-indigo-400 font-semibold mb-1">Tổng đơn hàng</p>
-                  <p className="text-2xl font-bold text-indigo-700">{results.summary.total}</p>
-                </div>
-                <div className="bg-white rounded-sm p-3 border border-emerald-100 shadow-sm">
-                  <p className="text-[10px] uppercase tracking-widest text-emerald-500 font-semibold mb-1">Đã về</p>
-                  <p className="text-2xl font-bold text-emerald-600">{results.summary.completed}</p>
-                  <p className="text-[11px] text-emerald-400 font-medium">{results.summary.completedPercentage}</p>
-                </div>
-                <div className="bg-white rounded-sm p-3 border border-amber-100 shadow-sm">
-                  <p className="text-[10px] uppercase tracking-widest text-amber-500 font-semibold mb-1">Chưa về</p>
-                  <p className="text-2xl font-bold text-amber-600">{results.summary.pending}</p>
-                  <p className="text-[11px] text-amber-400 font-medium">{results.summary.pendingPercentage}</p>
-                </div>
-                <div className="bg-white rounded-sm p-3 border border-rose-100 shadow-sm">
-                  <p className="text-[10px] uppercase tracking-widest text-rose-400 font-semibold mb-1">Chậm trễ</p>
-                  <p className="text-2xl font-bold text-rose-600">{parsedDelayedItems.length}</p>
-                  <p className="text-[11px] text-rose-300 font-medium">vật tư</p>
-                </div>
-              </div>
-
-              {/* Report body */}
-              <div className="flex flex-col md:flex-row gap-4 p-4 flex-1">
-                {/* Delivery report */}
-                <div className="flex-1 min-w-0">
-                  {results.summary.totalValue && (
-                    <div className="mb-3 px-3 py-2 bg-indigo-100 border border-indigo-200 rounded-sm flex items-center gap-2">
-                      <span className="text-[11px] uppercase tracking-widest text-indigo-500 font-semibold">Tổng giá trị:</span>
-                      <span className="text-sm font-bold text-indigo-800">{formatCurrency(results.summary.totalValue)}</span>
-                    </div>
-                  )}
-                  {parsedDeliveryReport.length > 0 && (
-                    <ul className="space-y-1.5">
-                      {parsedDeliveryReport.map((report, idx) => (
-                        <li key={idx} className="flex items-start gap-2 text-sm text-indigo-900">
-                          <span className="mt-1.5 shrink-0 w-1.5 h-1.5 rounded-full bg-indigo-400 inline-block" />
-                          {report}
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                </div>
-
-                {/* Delayed warning */}
-                {parsedDelayedItems.length > 0 && (
-                  <div className="md:w-72 shrink-0 bg-rose-50 border border-rose-200 rounded-sm p-3">
-                    <p className="flex items-center gap-1.5 text-[11px] uppercase tracking-widest font-bold text-rose-600 mb-2">
-                      <AlertTriangle className="w-3.5 h-3.5" />
-                      Cảnh báo chậm trễ
-                    </p>
-                    <ul className="space-y-1">
-                      {parsedDelayedItems.map((item, idx) => (
-                        <li key={idx} className="text-xs text-rose-800 font-medium flex items-start gap-1.5">
-                          <span className="mt-1 shrink-0 w-1.5 h-1.5 rounded-full bg-rose-400 inline-block" />
-                          {item}
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
+                {!file && !loading && (
+                  <span className="text-[11px] uppercase tracking-widest text-zinc-300 font-medium">
+                    PDF · XLSX · XLS · CSV
+                  </span>
                 )}
               </div>
+
+              {/* Loading bar */}
+              {loading && (
+                <div className="absolute inset-x-0 bottom-0 h-0.5 bg-zinc-100 overflow-hidden">
+                  <div className="h-full w-1/3 bg-indigo-500" style={{ animation: 'slide 1.5s ease-in-out infinite' }} />
+                </div>
+              )}
+            </label>
+
+            {/* Error */}
+            {error && (
+              <div className="p-3.5 bg-red-50 border border-red-200 text-red-700 text-sm flex items-start gap-2.5">
+                <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
+                <p>{error}</p>
+              </div>
+            )}
+
+            {/* Guard rails info */}
+            <div className="bg-white border border-zinc-200 divide-y divide-zinc-100">
+              {([
+                { Icon: ShieldCheck, label: 'Strict Output Mapping',   sub: 'JSON Schema enforced' },
+                { Icon: Zap,         label: 'Anti-Hallucination',      sub: 'Guardrails active' },
+                { Icon: ScanText,    label: 'OCR Date Correction',     sub: 'Auto-fix enabled' },
+              ] as const).map(({ Icon, label, sub }) => (
+                <div key={label} className="flex items-center gap-3 px-4 py-3">
+                  <Icon className="w-4 h-4 text-zinc-400 shrink-0" />
+                  <div>
+                    <p className="text-xs font-semibold text-zinc-700">{label}</p>
+                    <p className="text-[11px] text-zinc-400">{sub}</p>
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
-        )}
-      </div>
-    </div>
 
-      {/* ⬇️ BOTTOM ROW: Main Table Full Width */}
-      <div className="w-full">
-        {results && (
-          <div className="w-full animate-in fade-in slide-in-from-bottom-8 duration-700">
-            <div className="bg-white border border-zinc-200 shadow-sm overflow-hidden w-full">
-              <div className="px-5 py-4 border-b border-zinc-100 flex justify-between items-center bg-zinc-50">
-                <h3 className="font-semibold text-zinc-800 tracking-wide">BẢNG TỔNG HỢP DỮ LIỆU</h3>
+          {/* ── Right: Report Panel ──────────────────────────────────────── */}
+          <div className="flex-1 w-full min-w-0">
+
+            {/* Empty state */}
+            {!results && !loading && (
+              <div className="h-[280px] border border-dashed border-zinc-200 bg-white flex flex-col items-center justify-center gap-3 text-zinc-300">
+                <UploadCloud className="w-10 h-10" />
+                <p className="text-xs uppercase tracking-widest font-medium">Đang chờ dữ liệu đầu vào</p>
               </div>
-              <div className="overflow-x-auto">
+            )}
+
+            {/* Loading state */}
+            {loading && !results && (
+              <div className="h-[280px] border border-indigo-100 bg-gradient-to-br from-sky-50 via-indigo-50 to-violet-50 flex items-center justify-center">
+                <div className="flex flex-col items-center gap-3">
+                  <div className="relative w-12 h-12">
+                    <div className="absolute inset-0 rounded-full border-2 border-indigo-100" />
+                    <Loader2 className="absolute inset-0 m-auto w-6 h-6 animate-spin text-indigo-400" />
+                  </div>
+                  <p className="text-xs font-semibold text-indigo-400 tracking-widest uppercase">Analyzing Data...</p>
+                </div>
+              </div>
+            )}
+
+            {/* Results */}
+            {results && (
+              <div className="animate-in fade-in slide-in-from-bottom-2 duration-500">
+                <div className="border border-indigo-100 bg-gradient-to-br from-sky-50 via-indigo-50 to-violet-50 overflow-hidden">
+
+                  {/* Title bar */}
+                  <div className="px-5 py-3 bg-gradient-to-r from-indigo-600 to-violet-600 flex items-center justify-between gap-3">
+                    <p className="font-bold text-white text-xs uppercase tracking-widest truncate">
+                      Báo Cáo Nhanh &amp; Đánh Giá Tiến Độ
+                    </p>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <button
+                        onClick={handleReevaluate}
+                        disabled={isReevaluating}
+                        className="flex items-center gap-1.5 px-3 py-1.5 bg-white/15 hover:bg-white/25 text-white border border-white/30 text-xs font-semibold transition-all disabled:opacity-50"
+                      >
+                        {isReevaluating
+                          ? <Loader2 className="w-3 h-3 animate-spin" />
+                          : <Sparkles className="w-3 h-3" />}
+                        Đánh Giá Lại
+                      </button>
+                      <button
+                        onClick={exportToExcel}
+                        className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-500 hover:bg-emerald-400 text-white text-xs font-semibold transition-all"
+                      >
+                        <Download className="w-3 h-3" />
+                        Xuất Excel
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Stat cards */}
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 p-4 border-b border-indigo-100/60">
+                    <StatCard label="Tổng đơn hàng" value={results.summary.total}            color="indigo"  />
+                    <StatCard label="Đã về"          value={results.summary.completed}        color="emerald" sub={results.summary.completedPercentage} />
+                    <StatCard label="Chưa về"        value={results.summary.pending}          color="amber"   sub={results.summary.pendingPercentage} />
+                    <StatCard label="Chậm trễ"       value={parsedDelayedItems.length}        color="rose"    sub="vật tư" />
+                  </div>
+
+                  {/* Report body */}
+                  <div className="flex flex-col md:flex-row gap-4 p-4">
+
+                    {/* Delivery report */}
+                    <div className="flex-1 min-w-0 space-y-3">
+                      {results.summary.totalValue && (
+                        <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-indigo-100 border border-indigo-200">
+                          <span className="text-[10px] uppercase tracking-widest text-indigo-500 font-semibold">Tổng giá trị:</span>
+                          <span className="text-sm font-bold text-indigo-800">{formatCurrency(results.summary.totalValue)}</span>
+                        </div>
+                      )}
+                      {parsedDeliveryReport.length > 0 && (
+                        <ul className="space-y-1.5">
+                          {parsedDeliveryReport.map((report, idx) => (
+                            <li key={idx} className="flex items-start gap-2 text-sm text-indigo-900">
+                              <span className="mt-2 shrink-0 w-1 h-1 rounded-full bg-indigo-400 inline-block" />
+                              {report}
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                    </div>
+
+                    {/* Delayed warning panel */}
+                    {parsedDelayedItems.length > 0 && (
+                      <div className="md:w-60 shrink-0 bg-rose-50 border border-rose-200 p-3">
+                        <p className="flex items-center gap-1.5 text-[10px] uppercase tracking-widest font-bold text-rose-600 mb-2">
+                          <AlertTriangle className="w-3 h-3" />
+                          Cảnh báo chậm trễ
+                        </p>
+                        <ul className="space-y-1.5">
+                          {parsedDelayedItems.map((item, idx) => (
+                            <li key={idx} className="text-xs text-rose-800 font-medium flex items-start gap-1.5">
+                              <span className="mt-1 shrink-0 w-1 h-1 rounded-full bg-rose-400 inline-block" />
+                              {item}
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                  </div>
+
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* ── BOTTOM ROW: Full-width Table ───────────────────────────────── */}
+        {results && (
+          <div className="animate-in fade-in slide-in-from-bottom-4 duration-700">
+            <div className="bg-white border border-zinc-200 shadow-sm overflow-hidden">
+
+              {/* Table header bar */}
+              <div className="px-5 py-3.5 border-b border-zinc-100 bg-zinc-50 flex items-center justify-between">
+                <h3 className="text-xs font-semibold text-zinc-600 uppercase tracking-widest">
+                  Bảng Tổng Hợp Dữ Liệu
+                </h3>
+                <span className="text-xs text-zinc-400">{results.table.length} dòng</span>
+              </div>
+
+              {/* Scrollable table with sticky header */}
+              <div className="overflow-x-auto max-h-[520px] overflow-y-auto">
                 <table className="w-full text-sm text-left whitespace-nowrap">
-                  <thead className="bg-zinc-50 text-zinc-500 uppercase font-semibold text-[11px] tracking-wider">
+                  <thead className="sticky top-0 z-10 bg-zinc-50 border-b border-zinc-200">
                     <tr>
-                      <th className="px-5 py-3 border-b border-zinc-200 w-16 text-center">STT</th>
-                      <th className="px-5 py-3 border-b border-zinc-200">Mã PR</th>
-                      <th className="px-5 py-3 border-b border-zinc-200 min-w-[200px]">Mô Tả Vật Tư</th>
-                      <th className="px-5 py-3 border-b border-zinc-200">ĐVT</th>
-                      <th className="px-5 py-3 border-b border-zinc-200 text-right">S.Lượng</th>
-                      <th className="px-5 py-3 border-b border-zinc-200 text-right">Đơn Giá</th>
-                      <th className="px-5 py-3 border-b border-zinc-200 text-right">Thành Tiền</th>
-                      <th className="px-5 py-3 border-b border-zinc-200 text-center">Ngày Đề Xuất</th>
-                      <th className="px-5 py-3 border-b border-zinc-200 text-center">Ngày Dự Kiến</th>
-                      <th className="px-5 py-3 border-b border-zinc-200 text-center">Ngày Thực Tế</th>
-                      <th className="px-5 py-3 border-b border-zinc-200">Trạng Thái</th>
+                      {[
+                        { label: 'STT',          cls: 'w-12 text-center' },
+                        { label: 'Mã PR',        cls: '' },
+                        { label: 'Mô Tả Vật Tư',cls: 'min-w-[220px]' },
+                        { label: 'ĐVT',          cls: '' },
+                        { label: 'S.Lượng',      cls: 'text-right' },
+                        { label: 'Đơn Giá',      cls: 'text-right' },
+                        { label: 'Thành Tiền',   cls: 'text-right' },
+                        { label: 'Ngày ĐX',      cls: 'text-center' },
+                        { label: 'Ngày DK',      cls: 'text-center' },
+                        { label: 'Ngày TT',      cls: 'text-center' },
+                        { label: 'Trạng Thái',   cls: '' },
+                      ].map(({ label, cls }) => (
+                        <th key={label} className={`px-4 py-3 text-[11px] uppercase tracking-wider font-semibold text-zinc-500 ${cls}`}>
+                          {label}
+                        </th>
+                      ))}
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-zinc-100 text-zinc-700">
+                  <tbody className="divide-y divide-zinc-100">
                     {results.table.map((row, idx) => {
                       const isComplete = row.status === 'ĐÃ VỀ';
                       return (
-                        <tr key={idx} className={`transition-colors ${row.isDelayed ? 'bg-red-50/60 hover:bg-red-100/60' : 'hover:bg-zinc-50'}`}>
-                          <td className="p-0 border-b border-zinc-100 align-middle">
-                            <div className="px-5 py-4 text-center text-zinc-400">{row.stt}</div>
+                        <tr
+                          key={idx}
+                          className={`transition-colors ${row.isDelayed ? 'bg-rose-50/50 hover:bg-rose-50' : 'hover:bg-zinc-50/80'}`}
+                        >
+                          {/* STT */}
+                          <td className="px-4 py-3 text-center text-xs text-zinc-400 font-mono">{row.stt}</td>
+
+                          {/* Editable cells */}
+                          <td className="p-0 focus-within:z-10 relative">
+                            <input value={row.prNo || ''} onChange={(e) => handleCellChange(idx, 'prNo', e.target.value)}
+                              className="cell-input font-mono text-zinc-800" />
                           </td>
-                          <td className="p-0 border-b border-zinc-100 align-middle relative group focus-within:z-10">
-                            <input value={row.prNo || ''} onChange={(e) => handleCellChange(idx, 'prNo', e.target.value)} className="w-full bg-transparent px-5 py-4 font-mono text-zinc-900 border-none outline-none focus:bg-white focus:ring-1 focus:ring-blue-500 hover:bg-zinc-100/50 transition-colors" />
+                          <td className="p-0 focus-within:z-10 relative">
+                            <input value={row.description || ''} onChange={(e) => handleCellChange(idx, 'description', e.target.value)}
+                              className="cell-input min-w-[220px]" title={row.description} />
                           </td>
-                          <td className="p-0 border-b border-zinc-100 align-middle relative group focus-within:z-10">
-                            <input value={row.description || ''} onChange={(e) => handleCellChange(idx, 'description', e.target.value)} className="w-full min-w-[200px] bg-transparent px-5 py-4 truncate border-none outline-none focus:bg-white focus:ring-1 focus:ring-blue-500 hover:bg-zinc-100/50 transition-colors" title={row.description} />
+                          <td className="p-0 focus-within:z-10 relative">
+                            <input value={row.unit || ''} onChange={(e) => handleCellChange(idx, 'unit', e.target.value)}
+                              className="cell-input" />
                           </td>
-                          <td className="p-0 border-b border-zinc-100 align-middle relative group focus-within:z-10">
-                            <input value={row.unit || ''} onChange={(e) => handleCellChange(idx, 'unit', e.target.value)} className="w-full bg-transparent px-5 py-4 border-none outline-none focus:bg-white focus:ring-1 focus:ring-blue-500 hover:bg-zinc-100/50 transition-colors" />
+                          <td className="p-0 focus-within:z-10 relative">
+                            <input value={row.quantity || ''} onChange={(e) => handleCellChange(idx, 'quantity', e.target.value)}
+                              className="cell-input text-right font-mono" />
                           </td>
-                          <td className="p-0 border-b border-zinc-100 align-middle relative group focus-within:z-10">
-                            <input value={row.quantity || ''} onChange={(e) => handleCellChange(idx, 'quantity', e.target.value)} className="w-full text-right bg-transparent px-5 py-4 font-mono text-zinc-700 font-medium border-none outline-none focus:bg-white focus:ring-1 focus:ring-blue-500 hover:bg-zinc-100/50 transition-colors" />
+                          <td className="p-0 focus-within:z-10 relative">
+                            <input value={row.unitPrice || ''} onChange={(e) => handleCellChange(idx, 'unitPrice', e.target.value)}
+                              className="cell-input text-right font-mono text-zinc-500" />
                           </td>
-                          <td className="p-0 border-b border-zinc-100 align-middle relative group focus-within:z-10">
-                            <input value={row.unitPrice || ''} onChange={(e) => handleCellChange(idx, 'unitPrice', e.target.value)} className="w-full text-right bg-transparent px-5 py-4 font-mono text-zinc-500 border-none outline-none focus:bg-white focus:ring-1 focus:ring-blue-500 hover:bg-zinc-100/50 transition-colors" />
+
+                          {/* Thành Tiền (read-only) */}
+                          <td className="px-4 py-3 text-right font-mono text-zinc-800 font-medium">
+                            {formatCurrency(row.totalAmount)}
                           </td>
-                          <td className="p-0 border-b border-zinc-100 align-middle">
-                            <div className="w-full text-right bg-transparent px-5 py-4 font-mono text-zinc-900 font-medium">{formatCurrency(row.totalAmount)}</div>
+
+                          {/* Date cells */}
+                          <td className="p-0 focus-within:z-10 relative">
+                            <input value={row.proposalDate || ''} onChange={(e) => handleCellChange(idx, 'proposalDate', e.target.value)}
+                              className="cell-input text-center font-mono text-zinc-500" />
                           </td>
-                          <td className="p-0 border-b border-zinc-100 align-middle relative group focus-within:z-10">
-                            <input value={row.proposalDate || ''} onChange={(e) => handleCellChange(idx, 'proposalDate', e.target.value)} className="w-full text-center bg-transparent px-5 py-4 font-mono text-zinc-500 border-none outline-none focus:bg-white focus:ring-1 focus:ring-blue-500 hover:bg-zinc-100/50 transition-colors" />
+                          <td className="p-0 focus-within:z-10 relative">
+                            <input value={row.expectedDate || ''} onChange={(e) => handleCellChange(idx, 'expectedDate', e.target.value)}
+                              className={`cell-input text-center font-mono ${row.isDelayed && !isComplete ? 'text-rose-600 font-semibold' : 'text-zinc-500'}`} />
                           </td>
-                          <td className="p-0 border-b border-zinc-100 align-middle relative group focus-within:z-10">
-                            <input value={row.expectedDate || ''} onChange={(e) => handleCellChange(idx, 'expectedDate', e.target.value)} className={`w-full text-center bg-transparent px-5 py-4 font-mono border-none outline-none focus:bg-white focus:ring-1 focus:ring-blue-500 hover:bg-zinc-100/50 transition-colors ${row.isDelayed && !isComplete ? 'text-red-600 font-semibold' : 'text-zinc-500'}`} />
+                          <td className="p-0 focus-within:z-10 relative">
+                            <input value={row.actualDate || ''} onChange={(e) => handleCellChange(idx, 'actualDate', e.target.value)}
+                              className={`cell-input text-center font-mono ${isComplete ? (row.isDelayed ? 'text-rose-600 font-semibold' : 'text-emerald-600 font-medium') : 'text-zinc-500'}`} />
                           </td>
-                          <td className="p-0 border-b border-zinc-100 align-middle relative group focus-within:z-10">
-                            <input value={row.actualDate || ''} onChange={(e) => handleCellChange(idx, 'actualDate', e.target.value)} className={`w-full text-center bg-transparent px-5 py-4 font-mono border-none outline-none focus:bg-white focus:ring-1 focus:ring-blue-500 hover:bg-zinc-100/50 transition-colors ${isComplete ? (row.isDelayed ? 'text-red-600 font-semibold' : 'text-emerald-600 font-medium') : 'text-zinc-500'}`} />
-                          </td>
-                          <td className="px-5 py-4">
-                            <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-[2px] text-xs font-semibold ${isComplete ? 'bg-emerald-100 text-emerald-800' : 'bg-orange-100 text-orange-800'}`}>
-                              {isComplete ? <CheckCircle2 className="w-3 h-3" /> : <Clock className="w-3 h-3" />}
+
+                          {/* Status badge */}
+                          <td className="px-4 py-3">
+                            <span className={`inline-flex items-center gap-1 px-2 py-0.5 text-[11px] font-semibold ${isComplete ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'}`}>
+                              {isComplete
+                                ? <CheckCircle2 className="w-3 h-3" />
+                                : <Clock className="w-3 h-3" />}
                               {row.status}
                             </span>
                           </td>
@@ -418,10 +483,12 @@ function App() {
                   </tbody>
                 </table>
               </div>
+
             </div>
           </div>
         )}
-      </div>
+
+      </main>
     </div>
   );
 }

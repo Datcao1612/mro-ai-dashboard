@@ -1,6 +1,21 @@
 import { GoogleGenAI, Type } from '@google/genai';
 
-const getApiKey = () => import.meta.env.VITE_GEMINI_API_KEY || '';
+const getApiKey = (): string => import.meta.env.VITE_GEMINI_API_KEY || '';
+
+// ── Singleton client ───────────────────────────────────────────────────────────
+// GoogleGenAI is created once and reused across all calls, avoiding redundant
+// object construction and potential connection overhead on every request.
+let _client: GoogleGenAI | null = null;
+const getClient = (): GoogleGenAI => {
+  if (!_client) {
+    const apiKey = getApiKey();
+    if (!apiKey) {
+      throw new Error('Missing VITE_GEMINI_API_KEY environment variable. Vui lòng thiết lập API key.');
+    }
+    _client = new GoogleGenAI({ apiKey });
+  }
+  return _client;
+};
 
 export interface MROItem {
   stt: number;
@@ -100,13 +115,9 @@ Bạn là Chuyên gia Phân tích Dữ liệu Chuỗi cung ứng tại IBS Heavy
 - Nếu ngày ghi sai năm (ví dụ 13/3/2006 do lỗi OCR), hãy tự sửa về 2026 theo context.`;
 
 export async function analyzeMROData(rawText: string): Promise<MROAnalysisResult> {
-  const apiKey = getApiKey();
-  if (!apiKey) {
-    throw new Error("Missing VITE_GEMINI_API_KEY environment variable. Vui lòng thiết lập API key.");
-  }
-  const ai = new GoogleGenAI({ apiKey });
+  const ai = getClient(); // reuse singleton
   const response = await ai.models.generateContent({
-    model: 'gemini-2.5-flash',
+    model: 'gemini-2.5-flash-lite',
     contents: rawText,
     config: {
       systemInstruction: SYSTEM_PROMPT,

@@ -12,30 +12,33 @@ body {
   @apply bg-zinc-50 text-zinc-900 antialiased font-sans;
 }
 
+/* ─── Dropzone ─────────────────────────────────────── */
 .dropzone-container {
-  @apply w-full h-[300px] rounded-sm border-[1px] border-zinc-300 border-dashed bg-white 
-         flex flex-col items-center justify-center cursor-pointer transition-all duration-300 ease-out;
+  @apply relative w-full h-[220px] border border-dashed border-zinc-300 bg-white
+         flex flex-col items-center justify-center cursor-pointer
+         transition-all duration-300 ease-out overflow-hidden;
 }
 .dropzone-container:hover {
   @apply border-zinc-600 shadow-[4px_4px_0px_#18181b] -translate-y-1 -translate-x-1;
 }
 
-.card-minimal {
-  @apply bg-white border border-zinc-200 shadow-sm p-6 overflow-hidden;
+/* ─── Editable table cells ──────────────────────────── */
+.cell-input {
+  @apply w-full bg-transparent px-4 py-3 text-sm text-zinc-700
+         border-none outline-none
+         hover:bg-zinc-50/80 focus:bg-white focus:ring-1 focus:ring-inset focus:ring-indigo-400
+         transition-colors;
 }
 
-/* Scrollbar tweaks for standard tables */
-::-webkit-scrollbar {
-  height: 6px;
-  width: 6px;
+/* ─── Loading bar keyframe ──────────────────────────── */
+@keyframes slide {
+  0%   { transform: translateX(-100%); }
+  50%  { transform: translateX(100%); }
+  100% { transform: translateX(300%); }
 }
-::-webkit-scrollbar-track {
-  background: transparent; 
-}
-::-webkit-scrollbar-thumb {
-  background: #d4d4d8; 
-  border-radius: 4px;
-}
-::-webkit-scrollbar-thumb:hover {
-  background: #a1a1aa; 
-}
+
+/* ─── Scrollbar ─────────────────────────────────────── */
+::-webkit-scrollbar       { height: 5px; width: 5px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #d4d4d8; border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: #a1a1aa; }
